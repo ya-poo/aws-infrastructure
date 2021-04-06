@@ -15,7 +15,7 @@ export class AwsInfrastructureStack extends cdk.Stack {
             subnetConfiguration: []
         })
 
-        const subnets = [
+        const workerSubnets = [
             new Subnet(this, 'WorkerSubnet0', {
                 availabilityZone: 'ap-northeast-1a',
                 vpcId: vpc.vpcId,
@@ -42,7 +42,7 @@ export class AwsInfrastructureStack extends cdk.Stack {
             internetGatewayId: internetGateway.ref
         })
 
-        subnets.forEach(subnet => {
+        workerSubnets.forEach(subnet => {
             subnet.addRoute(`${subnet.stack.stackName}PublicRoute`, {
                 routerType: RouterType.GATEWAY,
                 routerId: internetGateway.ref
@@ -104,6 +104,10 @@ export class AwsInfrastructureStack extends cdk.Stack {
         new CfnEIPAssociation(this, 'BastionServerEIPAssociation', {
             allocationId: eip.attrAllocationId,
             instanceId: bastionServer.instanceId
+        })
+
+        new cdk.CfnOutput(this, `WorkerSubnets`, {
+            value: workerSubnets.map(subnet => { return subnet.subnetId }).join(',')
         })
     }
 }
