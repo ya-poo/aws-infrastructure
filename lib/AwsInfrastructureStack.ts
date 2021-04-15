@@ -1,9 +1,23 @@
 import {
-    AmazonLinuxGeneration, AmazonLinuxImage, BlockDeviceVolume, CfnEIP, CfnEIPAssociation,
-    CfnInternetGateway, CfnVPCGatewayAttachment, EbsDeviceVolumeType, Instance, InstanceClass,
-    InstanceSize, InstanceType, RouterType, SecurityGroup, Subnet, UserData, Vpc
+    AmazonLinuxGeneration,
+    AmazonLinuxImage,
+    BlockDeviceVolume,
+    CfnEIP,
+    CfnEIPAssociation,
+    CfnInternetGateway,
+    CfnVPCGatewayAttachment,
+    EbsDeviceVolumeType,
+    Instance,
+    InstanceClass,
+    InstanceSize,
+    InstanceType,
+    RouterType,
+    SecurityGroup,
+    Subnet,
+    UserData,
+    Vpc
 } from '@aws-cdk/aws-ec2';
-import { ManagedPolicy, Role, ServicePrincipal } from '@aws-cdk/aws-iam';
+import {ManagedPolicy, Role, ServicePrincipal} from '@aws-cdk/aws-iam';
 import * as cdk from '@aws-cdk/core';
 
 export class AwsInfrastructureStack extends cdk.Stack {
@@ -82,10 +96,10 @@ export class AwsInfrastructureStack extends cdk.Stack {
         )
         const bastionServer = new Instance(this, `BastionServer`, {
             vpc: vpc,
-            vpcSubnets: vpc.selectSubnets({ subnets: [bastionServerSubnet] }),
+            vpcSubnets: vpc.selectSubnets({subnets: [bastionServerSubnet]}),
             securityGroup: bastionServerSecurityGroup,
             instanceType: InstanceType.of(InstanceClass.T2, InstanceSize.MICRO),
-            machineImage: new AmazonLinuxImage({ generation: AmazonLinuxGeneration.AMAZON_LINUX_2 }),
+            machineImage: new AmazonLinuxImage({generation: AmazonLinuxGeneration.AMAZON_LINUX_2}),
             blockDevices: [
                 {
                     deviceName: '/dev/xvda',
@@ -107,7 +121,9 @@ export class AwsInfrastructureStack extends cdk.Stack {
         })
 
         new cdk.CfnOutput(this, `WorkerSubnets`, {
-            value: workerSubnets.map(subnet => { return subnet.subnetId }).join(',')
+            value: workerSubnets.map(subnet => {
+                return subnet.subnetId
+            }).join(',')
         })
     }
 }
