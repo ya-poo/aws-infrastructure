@@ -11,6 +11,8 @@ import {
     InstanceClass,
     InstanceSize,
     InstanceType,
+    Peer,
+    Port,
     RouterType,
     SecurityGroup,
     Subnet,
@@ -19,6 +21,15 @@ import {
 } from '@aws-cdk/aws-ec2';
 import {ManagedPolicy, Role, ServicePrincipal} from '@aws-cdk/aws-iam';
 import * as cdk from '@aws-cdk/core';
+import {Duration} from '@aws-cdk/core';
+import {
+    Credentials,
+    DatabaseInstance,
+    DatabaseInstanceEngine,
+    DatabaseSecret,
+    PostgresEngineVersion,
+    StorageType
+} from "@aws-cdk/aws-rds";
 
 export class AwsInfrastructureStack extends cdk.Stack {
     constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
@@ -78,8 +89,8 @@ export class AwsInfrastructureStack extends cdk.Stack {
             vpc: vpc,
             description: 'Security Group for Bastion Server'
         })
-        const operationServerRole = new Role(this, `BastionServerRole`, {
-            roleName: `BastionServerRole`,
+        const operationServerRole = new Role(this, 'BastionServerRole', {
+            roleName: 'BastionServerRole',
             managedPolicies: [
                 ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonEC2RoleforSSM')
             ],
@@ -120,7 +131,64 @@ export class AwsInfrastructureStack extends cdk.Stack {
             instanceId: bastionServer.instanceId
         })
 
-        new cdk.CfnOutput(this, `WorkerSubnets`, {
+        // DB
+        const rdsSubnets = [
+            new Subnet(this, 'RdsSubnet1', {
+                availabilityZone: 'ap-northeast-1a',
+                vpcId: vpc.vpcId,
+                cidrBlock: '172.16.4.0/24',
+                mapPublicIpOnLaunch: false
+            }),
+            new Subnet(this, 'RdsSubnet2', {
+                availabilityZone: 'ap-northeast-1c',
+                vpcId: vpc.vpcId,
+                cidrBlock: '172.16.5.0/24',
+                mapPublicIpOnLaunch: false
+            }),
+            new Subnet(this, 'RdsSubnet3', {
+                availabilityZone: 'ap-northeast-1d',
+                vpcId: vpc.vpcId,
+                cidrBlock: '172.16.6.0/24',
+                mapPublicIpOnLaunch: false
+            })
+        ]
+        const rdsSecurityGroup = new SecurityGroup(this, 'RdsSecurityGroup', {
+            vpc: vpc,
+            description: 'Security Group for RDS'
+        })
+        workerSubnets.forEach(subnet => {
+            rdsSecurityGroup.addIngressRule(Peer.ipv4(subnet.ipv4CidrBlock), Port.tcp(5432))
+        })
+
+        const database = new DatabaseInstance(this, 'WorkDb', {
+            instanceIdentifier: 'WorkDB',
+            vpc: vpc,
+            vpcSubnets: {subnets: rdsSubnets},
+            securityGroups: [rdsSecurityGroup],
+            multiAz: true,
+            storageType: StorageType.GP2,
+            engine: DatabaseInstanceEngine.postgres({
+                version: PostgresEngineVersion.VER_12_4
+            }),
+            allocatedStorage: 30,
+            databaseName: 'WorkDB',
+            instanceType: InstanceType.of(InstanceClass.T2, InstanceSize.MICRO),
+            backupRetention: Duration.days(7),
+            preferredBackupWindow: '18:00-18:30',
+            preferredMaintenanceWindow: 'sat:19:00-sat:19:30',
+            copyTagsToSnapshot: true,
+            deleteAutomatedBackups: false,
+            autoMinorVersionUpgrade: false,
+            deletionProtection: false,
+            publiclyAccessible: false,
+            credentials: Credentials.fromGeneratedSecret('workdbadmin')
+        })
+        database.addRotationMultiUser('WorkDbUser', {
+            secret: new DatabaseSecret(this, 'WorkDbUser', {username: 'yapoo'})
+        })
+
+        // outputs
+        new cdk.CfnOutput(this, 'WorkerSubnets', {
             value: workerSubnets.map(subnet => {
                 return subnet.subnetId
             }).join(',')
